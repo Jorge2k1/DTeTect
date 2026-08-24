@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Evidence Aggregation System",
+  "version": "0.1.0",
+  "description": "Analiza el contenido visible de la pestaña activa y calcula un score de confianza explicado, sin enviar datos a servidores externos.",
+  "permissions": ["activeTab", "scripting", "sidePanel"],
+  "background": {
+    "service_worker": "background/service-worker.ts",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
+  "action": {
+    "default_title": "Evidence Aggregation System"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-scripts/content-script.ts"],
+      "run_at": "document_idle"
+    }
+  ]
+}

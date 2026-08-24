@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Evidence Aggregation System</title>
+    <link rel="stylesheet" href="./sidepanel.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <header class="panel-header">
+        <h1>Evidence Aggregation System</h1>
+        <p id="status" class="status">Analizando contenido visible…</p>
+      </header>
+
+      <section class="score-card">
+        <div id="score" class="score-value">—</div>
+        <div id="confidence" class="confidence-label">Confianza del análisis: —</div>
+      </section>
+
+      <section class="summary">
+        <h2>Resumen</h2>
+        <p id="summary"></p>
+      </section>
+
+      <section class="evidence">
+        <h2>Evidencias</h2>
+        <ul id="evidence-list" class="evidence-list"></ul>
+      </section>
+    </main>
+    <script type="module" src="./sidepanel.ts"></script>
+  </body>
+</html>

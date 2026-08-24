@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Blog corporativo — IA en la empresa</title>
+  </head>
+  <body>
+    <nav><a href="#">Inicio</a> <a href="#">Blog</a> <a href="#">Contacto</a></nav>
+
+    <article>
+3.2.1 Situations related to the risk management system 
+
+Logging is a fundamental enabler of an AI system’s risk management system, as it provides structured evidence on how risks emerge, evolve, and are mitigated during operation. Events are relevant for logging when their recording supports the identification of risk scenarios, the monitoring of known risks, or the evaluation of the effectiveness of implemented risk controls throughout the system lifecycle. This risk-oriented use of logs is consistent with AI risk management principles as reflected in ISO/IEC 23894, and with security monitoring practices emphasised in ISO/IEC 27001 and ISO/IEC 27002. 
+
+In accordance with the AI Act, AI systems presenting must ensure that risk-relevant events are captured to support operational oversight and regulatory compliance. Logging enables organisations to demonstrate that appropriate measures are in place to detect and control risks to health, safety, and fundamental rights throughout the system lifecycle. 
+
+Illustrative situation: 
+
+A predictive maintenance model used by an airline incorporates periodic self-check routines that compare current sensor parameter distributions with expected baselines. The system continuously logs key operational metrics and events, enabling ongoing monitoring of system performance and early detection of deviations, even when no failures occur. When the system detects early signs of parameter drift, it automatically triggers a safeguarded degradation mode, limiting automated decision-making until recalibration is completed. All events associated with the detection of drift, activation of the degradation mode, and subsequent recalibration actions are logged. These records allow the airline to trace how risks were identified and mitigated, while also supporting continuous oversight of the system’s operation, internal risk management, and compliance with applicable regulatory requirements. 
+
+3.2.2 Situations related to serious incident detection and reporting 
+
+Certain events are relevant for logging because their recording enables the timely detection, analysis and reconstruction of incidents that may qualify as serious incidents under the AI Act. In this context, logging preserves information on system behaviour, operational conditions, input perturbations and safeguard activation before, during and after an incident, supporting accountability and forensic analysis in line with incident handling and investigation practices emphasised in ISO/IEC 27001 and ISO/IEC 27002. 
+
+Under the AI Act, providers of high-risk AI systems must report serious incidents to the competent market surveillance authorities without undue delay and establish a causal link between the system and the incident. Initial reports may be submitted where full information is not yet available, followed by further investigation and corrective actions. Logs are essential for reconstructing the sequence of events, assessing incident severity and supporting compliance with regulatory reporting timelines. 
+
+Illustrative situation: 
+
+A land-use classification AI model deployed for remote-sensing analyses experiences adversarial perturbations that reduce its accuracy from 88% to 0% when noise exceeds ε ≥ 4/255. Following the application of adversarial training defences, the model maintains roughly 30% accuracy under identical perturbations. Logging records all model predictions, perturbation magnitudes, accuracy metrics, and defence activations. These logs allow the provider to reconstruct the incident, determine whether thresholds for acceptable performance were breached, report the serious incident to authorities within the required timeframe, and evaluate the effectiveness of mitigation measures. 
+</article>
+
+    <footer>© Blog corporativo</footer>
+  </body>
+</html>
