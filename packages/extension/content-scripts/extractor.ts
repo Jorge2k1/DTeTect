@@ -37,12 +37,23 @@ function isLeafBlock(el: Element): boolean {
   return el.querySelector(BLOCK_SELECTOR) === null;
 }
 
+export interface ExtractOptions {
+  /**
+   * Un documento parseado a partir de un archivo subido (no insertado en la
+   * página en vivo) no tiene layout: getComputedStyle/getBoundingClientRect
+   * no reflejan nada real. Para ese caso se salta la comprobación de
+   * visibilidad y se confía solo en los filtros de exclusión/densidad de
+   * enlaces/longitud, que no dependen de layout.
+   */
+  skipVisibilityCheck?: boolean;
+}
+
 /**
  * Extracción tipo Readability: recorre bloques semánticos, descarta
  * navegación/publicidad por ancestro y por densidad de enlaces, y deduplica
  * texto repetido (p. ej. tarjetas de producto repetidas en el DOM).
  */
-export function extractVisibleText(root: ParentNode = document): string {
+export function extractVisibleText(root: ParentNode = document, options: ExtractOptions = {}): string {
   const blocks = Array.from(root.querySelectorAll(BLOCK_SELECTOR)).filter(isLeafBlock);
   const seenText = new Set<string>();
   const chunks: string[] = [];
@@ -50,7 +61,7 @@ export function extractVisibleText(root: ParentNode = document): string {
   for (const block of blocks) {
     if (!(block instanceof HTMLElement)) continue;
     if (isExcluded(block)) continue;
-    if (!isVisible(block)) continue;
+    if (!options.skipVisibilityCheck && !isVisible(block)) continue;
 
     const text = (block.textContent ?? '').replace(/\s+/g, ' ').trim();
     if (text.length < MIN_BLOCK_TEXT_LENGTH) continue;

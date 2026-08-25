@@ -9,22 +9,58 @@
     <main class="panel">
       <header class="panel-header">
         <h1>Evidence Aggregation System</h1>
-        <p id="status" class="status">Analizando contenido visible…</p>
+        <nav class="tabs" role="tablist">
+          <button type="button" class="tab-button" data-tab="dom" role="tab" aria-selected="true">
+            Página actual
+          </button>
+          <button type="button" class="tab-button" data-tab="file" role="tab" aria-selected="false">
+            Analizar archivo
+          </button>
+        </nav>
       </header>
 
-      <section class="score-card">
-        <div id="score" class="score-value">—</div>
-        <div id="confidence" class="confidence-label">Confianza del análisis: —</div>
+      <section class="tab-panel" data-tab-panel="dom">
+        <p id="dom-status" class="status">Analizando contenido visible…</p>
+
+        <section class="score-card">
+          <div id="dom-score" class="score-value">—</div>
+          <div id="dom-confidence" class="confidence-label">Confianza del análisis: —</div>
+        </section>
+
+        <section class="summary">
+          <h2>Resumen</h2>
+          <p id="dom-summary"></p>
+        </section>
+
+        <section class="evidence">
+          <h2>Evidencias</h2>
+          <ul id="dom-evidence-list" class="evidence-list"></ul>
+        </section>
       </section>
 
-      <section class="summary">
-        <h2>Resumen</h2>
-        <p id="summary"></p>
-      </section>
+      <section class="tab-panel" data-tab-panel="file" hidden>
+        <label class="file-drop" id="file-drop" for="file-input">
+          <input type="file" id="file-input" accept=".txt,.md,.markdown,.html,.htm,.docx,.pdf" hidden />
+          <span class="file-drop-text">Arrastra un archivo aquí o haz clic para seleccionarlo</span>
+          <span class="file-drop-hint">.txt · .md · .html · .docx · .pdf</span>
+        </label>
 
-      <section class="evidence">
-        <h2>Evidencias</h2>
-        <ul id="evidence-list" class="evidence-list"></ul>
+        <p id="file-status" class="status"></p>
+
+        <section class="score-card">
+          <div id="file-score" class="score-value">—</div>
+          <div id="file-confidence" class="confidence-label">Confianza del análisis: —</div>
+        </section>
+
+        <section class="summary">
+          <h2>Resumen</h2>
+          <p id="file-summary"></p>
+        </section>
+
+        <section class="evidence">
+          <h2>Evidencias</h2>
+          <ul id="file-evidence-list" class="evidence-list"></ul>
+        </section>
       </section>
     </main>
     <script type="module" src="./sidepanel.ts"></script>

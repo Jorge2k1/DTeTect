@@ -57,4 +57,22 @@ describe('extractVisibleText', () => {
     document.body.innerHTML = '<article><p>Muy corto.</p></article>';
     expect(extractVisibleText()).toBe('');
   });
+
+  it('con skipVisibilityCheck, extrae texto de un documento sin layout (archivo subido)', () => {
+    const doc = new DOMParser().parseFromString(`<article><p>${LONG_PARAGRAPH}</p></article>`, 'text/html');
+
+    expect(extractVisibleText(doc)).toBe('');
+    expect(extractVisibleText(doc, { skipVisibilityCheck: true })).toBe(LONG_PARAGRAPH);
+  });
+
+  it('con skipVisibilityCheck, sigue excluyendo nav/header/footer/aside y deduplicando', () => {
+    const doc = new DOMParser().parseFromString(
+      `<nav><p>${LONG_PARAGRAPH} en la navegación.</p></nav>
+       <article><p>${LONG_PARAGRAPH}</p><section><p>${LONG_PARAGRAPH}</p></section></article>`,
+      'text/html'
+    );
+
+    const occurrences = extractVisibleText(doc, { skipVisibilityCheck: true }).split(LONG_PARAGRAPH).length - 1;
+    expect(occurrences).toBe(1);
+  });
 });

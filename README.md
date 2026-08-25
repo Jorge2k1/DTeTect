@@ -95,7 +95,7 @@ evidencia dura (C2PA/EXIF, V2).
 
 ```bash
 npm install
-npm test              # vitest en core + extension (29 tests)
+npm test              # vitest en core + extension
 npm run typecheck
 npm run build:extension   # genera packages/extension/dist
 ```
@@ -106,9 +106,87 @@ desarrollador" → "Cargar descomprimida" → seleccionar
 sin depender de un sitio real (requiere activar "Permitir acceso a las URL
 de archivo" en los detalles de la extensión).
 
-### Próximos pasos
+### Próximos pasos (Fase 1)
 
 1. Implementar perplexity real vía ONNX Runtime Web (modelo pequeño tipo
    distilgpt2), sustituyendo el stub sin tocar el Fusion Engine ni la UI.
+   Aparcado de momento: se probó en local (ver Capítulo 3) y no resuelve el
+   problema que se buscaba resolver.
 2. V2: señales de imagen (C2PA, Content Credentials, EXIF) sumándose al
    mismo `Evidence[]` y a la misma UI.
+
+---
+
+## Capítulo 2 — Side panel: pestañas, desglose por señal y subida de archivos
+
+Extiende la Fase 1 sin tocar el core: **no se creó ninguna señal ni lógica
+de detección nueva**. Todo lo de este capítulo es UI y extracción de texto
+en el host (`packages/extension`). El pipeline de análisis —
+`burstinessSignal` + `mattrSignal` + `ngramRepetitionSignal` +
+`stubPerplexitySignal` → `fuse()` → `explain()` — es exactamente el mismo
+del Capítulo 1 (función `collectEvidence`, sin cambios), y ahora lo
+comparten dos flujos de entrada distintos en vez de uno.
+
+### Dos pestañas en el side panel
+
+- **Página actual**: el flujo de siempre (pestaña activa → content script →
+  `extractVisibleText`).
+- **Analizar archivo**: arrastra o selecciona un archivo propio
+  (`.txt`, `.md`, `.html`, `.docx`, `.pdf`) y se analiza con el mismo
+  pipeline. Pensado para el caso "quiero comprobar MI documento", ya que no
+  se puede confiar en extraer bien el contenido de cualquier web.
+
+Cada pestaña tiene su propio bloque de resultado (`#dom-*` / `#file-*` en
+el HTML) para no perder el resultado de una al mirar la otra; ambas
+reutilizan las mismas funciones de renderizado (`renderResult`,
+`renderLoading`, `renderEmpty`) parametrizadas por qué elementos pintar.
+
+### Desglose por señal
+
+Cada evidencia en la UI ahora muestra, además del texto explicativo:
+contribución en % con dirección ("43% hacia IA"), una barra visual
+centrada en 0, la confianza de esa señal concreta y su peso final en el
+resultado. Es el mismo dato que `fuse()`/`explain()` ya calculaban — antes
+no se mostraba desglosado, ahora sí.
+
+### Lectores de archivo (`packages/extension/sidepanel/file-readers.ts`)
+
+- `.txt` / `.md` / `.markdown`: texto plano tal cual.
+- `.html` / `.htm`: se parsea con `DOMParser` y se reutiliza el **mismo**
+  `extractVisibleText` del content script — no hay una segunda
+  implementación de extracción. Un documento de `DOMParser` no está
+  insertado en la página, así que no tiene layout real; se añadió una
+  opción `skipVisibilityCheck` a `extractVisibleText` para ese caso
+  concreto (los filtros de exclusión de nav/header/footer, densidad de
+  enlaces y longitud mínima se siguen aplicando igual).
+- `.docx`: vía `mammoth` (dependencia nueva).
+- `.pdf`: vía `pdfjs-dist`, la librería oficial de PDF.js (dependencia
+  nueva).
+- `mammoth` y `pdfjs-dist` se cargan con `import()` dinámico, no al abrir
+  el side panel: juntos pesan más de 1MB y la mayoría de sesiones no tocan
+  esa pestaña. El bundle inicial del side panel se queda en ~11KB; cada
+  lector se descarga solo la primera vez que hace falta.
+
+### Qué NO cambió en este capítulo
+
+- `packages/core` no se tocó: mismas señales, mismos pesos, mismo Fusion
+  Engine que en el Capítulo 1.
+- No existe una segunda extracción de texto para HTML: se extendió
+  `extractVisibleText` con una opción, no se duplicó la lógica.
+
+---
+
+## Capítulo 3 — Intento de perplexity real (ONNX), aparcado
+
+Se probó, en local (no integrado en la extensión), `@huggingface/transformers`
++ `Xenova/distilgpt2` para calcular perplexity real (cross-entropy sobre los
+logits del modelo, no un proxy). Funcionó técnicamente — el modelo se
+descarga y ejecuta bien — pero al medirlo contra los textos de referencia
+dio el mismo problema que MATTR: la perplexity de un modelo pequeño
+depende mucho del género/registro del texto (técnico vs. narrativo), no
+solo de si lo escribió una IA. El texto de la página "Company" de
+anthropic.com dio una perplexity casi idéntica a un blog humano casual
+(47 vs. 42), y un texto técnico de IA dio la perplexity *más alta* de
+todas (81) — el modelo lo leía como "el menos predecible", al revés de lo
+esperado. No se integró en la extensión: el código no llegó a tocar
+`packages/core` ni `packages/extension`.
