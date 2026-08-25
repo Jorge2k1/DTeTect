@@ -2,7 +2,94 @@
 pepper
 pan de pipillas
 
-## Evidence Aggregation System (Fase 1 — texto)
+### Índice
+
+- [Capítulo 0 — Instalar la extensión (primera vez)](#capítulo-0--instalar-la-extensión-primera-vez)
+- [Capítulo 1 — Evidence Aggregation System (Fase 1 — texto)](#capítulo-1--evidence-aggregation-system-fase-1--texto)
+- [Capítulo 2 — Side panel: pestañas, desglose por señal y subida de archivos](#capítulo-2--side-panel-pestañas-desglose-por-señal-y-subida-de-archivos)
+- [Capítulo 3 — Intento de perplexity real (ONNX), aparcado](#capítulo-3--intento-de-perplexity-real-onnx-aparcado)
+
+---
+
+## Capítulo 0 — Instalar la extensión (primera vez)
+
+Guía pensada para alguien que no ha hecho esto antes. Se hace una sola vez;
+si el código cambia más adelante, solo hace falta repetir el paso 4 y
+recargar en el navegador (paso 6).
+
+### 1. Instalar Node.js (si no lo tienes)
+
+Descarga e instala la versión **LTS** desde [nodejs.org](https://nodejs.org).
+Para comprobar si ya lo tienes, abre una terminal y ejecuta:
+
+```bash
+node -v
+```
+
+Si devuelve un número de versión (p. ej. `v22.x.x`), ya está.
+
+### 2. Descargar el código
+
+Con git instalado:
+
+```bash
+git clone https://github.com/Jorge2k1/Pimienta.git
+cd Pimienta
+```
+
+Si no usas git: en la página de GitHub del repositorio, botón verde
+**Code** → **Download ZIP**, y descomprime la carpeta.
+
+> Por defecto, `main` tiene solo la Fase 1 (análisis de la página actual).
+> Para la versión con pestañas y subida de archivos (Capítulo 2), después
+> del `git clone` ejecuta:
+> ```bash
+> git checkout feature/sidepanel-tabs-file-upload
+> ```
+
+### 3. Instalar las dependencias
+
+Desde la carpeta del proyecto:
+
+```bash
+npm install
+```
+
+Tarda uno o dos minutos la primera vez.
+
+### 4. Construir la extensión
+
+```bash
+npm run build:extension
+```
+
+Esto genera la carpeta `packages/extension/dist` — es lo que carga el
+navegador, no el código fuente directamente.
+
+### 5. Cargar la extensión en Edge
+
+1. Abre `edge://extensions` en la barra de direcciones.
+2. Activa **Modo de desarrollador** (interruptor abajo a la izquierda).
+3. Clic en **Cargar descomprimida**.
+4. Selecciona la carpeta `packages/extension/dist`.
+
+### 6. Usarla
+
+1. Clic en el icono de piezas de puzzle de la barra de Edge y fija
+   "Evidence Aggregation System" (icono de alfiler).
+2. Clic en su icono: se abre el panel lateral.
+3. Pestaña **Página actual**: analiza automáticamente la pestaña que
+   tengas activa. Pestaña **Analizar archivo** (si estás en la rama del
+   Capítulo 2): arrastra o selecciona un archivo propio (`.txt`, `.md`,
+   `.html`, `.docx`, `.pdf`).
+
+Si vuelves a modificar el código, repite el paso 4
+(`npm run build:extension`) y después pulsa el icono ↻ ("Recargar") en la
+tarjeta de la extensión dentro de `edge://extensions`.
+
+---
+
+## Capítulo 1 — Evidence Aggregation System (Fase 1 — texto)
 
 Extensión de navegador (Edge, Manifest V3) que analiza el texto visible de la
 pestaña activa y calcula un **score de confianza explicado**, combinando
