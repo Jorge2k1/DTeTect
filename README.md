@@ -8,6 +8,7 @@ pan de pipillas
 - [Capítulo 1 — Evidence Aggregation System (Fase 1 — texto)](#capítulo-1--evidence-aggregation-system-fase-1--texto)
 - [Capítulo 2 — Side panel: pestañas, desglose por señal y subida de archivos](#capítulo-2--side-panel-pestañas-desglose-por-señal-y-subida-de-archivos)
 - [Capítulo 3 — Intento de perplexity real (ONNX), aparcado](#capítulo-3--intento-de-perplexity-real-onnx-aparcado)
+- [Capítulo 4 — Fase 2: señales de imagen (EXIF + C2PA)](#capítulo-4--fase-2-señales-de-imagen-exif--c2pa)
 
 ---
 
@@ -40,9 +41,9 @@ cd Pimienta
 Si no usas git: en la página de GitHub del repositorio, botón verde
 **Code** → **Download ZIP**, y descomprime la carpeta.
 
-> Por defecto, `main` tiene solo la Fase 1 (análisis de la página actual).
-> Para la versión con pestañas y subida de archivos (Capítulo 2), después
-> del `git clone` ejecuta:
+> Por defecto, `main` tiene solo la Fase 1 (análisis de la página actual,
+> solo texto). Para la versión con pestañas, subida de archivos y señales
+> de imagen (Capítulos 2 y 4), después del `git clone` ejecuta:
 > ```bash
 > git checkout feature/sidepanel-tabs-file-upload
 > ```
@@ -277,3 +278,123 @@ anthropic.com dio una perplexity casi idéntica a un blog humano casual
 todas (81) — el modelo lo leía como "el menos predecible", al revés de lo
 esperado. No se integró en la extensión: el código no llegó a tocar
 `packages/core` ni `packages/extension`.
+
+---
+
+## Capítulo 4 — Fase 2: señales de imagen (EXIF + C2PA)
+
+Añade evidencia de imagen sumándose al **mismo** `Evidence[]`, **mismo**
+Fusion Engine y **misma** UI que el texto — sin `ImageEvidence` paralelo,
+sin un segundo motor de fusión. Probado de extremo a extremo contra
+imágenes C2PA reales, no solo con fixtures inventadas.
+
+### Generalización previa (antes de escribir código nuevo)
+
+Auditar `Evidence`/`fuse()` reveló que el Fusion Engine, tal como estaba,
+no garantizaba lo que pedía el encargo: un promedio ponderado plano
+significa que, por muy alto que sea el peso de una señal, sigue siendo un
+voto entre otros — un C2PA válido con confianza máxima podía diluirse a
+un empate frente a suficiente evidencia en contra. Dos cambios antes de
+tocar imagen:
+
+- **`Evidence.sourceId`** (opcional): identifica de qué elemento concreto
+  viene cada evidencia (`'page-text'`, o la URL de una imagen). `fuse()`
+  no cambia de firma — se llama **una vez por sujeto**, nunca mezclando
+  texto e imagen en la misma fusión. Así el texto de la página nunca puede
+  diluir la evidencia dura de una imagen, por diseño, no por suerte.
+- **Fusión por niveles** en `fusion-engine.ts`: `HARD_EVIDENCE_SIGNALS`
+  (de momento solo `c2pa-provenance`) se promedia aparte del resto y
+  domina el resultado al 90% frente al 10% de la evidencia blanda. Sin
+  evidencia dura, el comportamiento es idéntico byte a byte al promedio
+  ponderado de la Fase 1 (verificado con test — no rompe nada existente).
+
+### Señales nuevas (`packages/core/signals/image/`)
+
+- **`exif.ts`**: vía `exifr`, que corre igual en Node que en navegador —
+  100% testeable en vitest, como las señales de texto.
+- **`c2pa.ts`**: solo el **mapeo puro** de un resultado de verificación ya
+  simplificado (`C2paCheckResult`) al `Evidence` genérico. La invocación
+  real del SDK (`@contentauth/c2pa-web`) no puede vivir aquí — usa un Web
+  Worker del navegador y `fetch()` de un binario WASM, ninguno disponible
+  en Node/vitest (verificado al intentarlo: falla con "Worker is not
+  defined" y "fetch failed" para `file://`).
+- **`known-ai-tools.ts`**: lista de nombres de herramientas de IA
+  conocidas, compartida entre `exif.ts` y `c2pa.ts` (antes duplicada).
+
+`c2pa.ts` reconoce el vocabulario IPTC de `digitalSourceType` más allá de
+`trainedAlgorithmicMedia` — también `algorithmicMedia`, `dataDrivenMedia`,
+`compositeSynthetic` hacia IA, y `computationalCapture`,
+`compositeCapture` hacia cámara — encontrado al probar contra fixtures
+reales de `c2pa-rs`, no supuesto de antemano. Deliberadamente **no**
+incluye valores ambiguos como `digitalArt` o `screenCapture`: pueden ser
+100% obra humana y tratarlos como evidencia de IA sería prometer una
+certeza que no tenemos.
+
+**Caso "C2PA válido pero sin `digitalSourceType` concluyente"**: no es un
+cero plano. Las herramientas de generación de IA tienen un motivo muy
+concreto para declarar ese campo (es su forma de cumplir con el Artículo
+50 del EU AI Act) — si una herramienta firmó C2PA pero no lo declaró, es
+más probable que sea una herramienta sin ese motivo (cámara, editor, test)
+que una IA que "se olvidó" de la única razón por la que usaría C2PA.
+Confirmado con datos reales: los dos manifiestos de prueba sin
+`digitalSourceType` eran de `Truepic_Lens_SDK` (verificación de cámara
+real) y `make_test_images` (herramienta de test del propio SDK de C2PA) —
+ninguna de las dos es IA. Por eso este caso inclina levemente hacia
+humano, con confianza baja, en vez de no aportar nada.
+
+### Extensión: dónde puede vivir cada pieza (varias vueltas de depuración real)
+
+- **`content-scripts/image/image-extractor.ts`**: identifica imágenes
+  visibles (`IntersectionObserver`, tanto `<img>` como fondos CSS) —
+  **nunca** lee píxeles (choca con la política de "tainted canvas" para
+  imágenes cross-origin). Solo manda `{url, elementId, width, height}` por
+  `chrome.runtime.sendMessage`.
+- El análisis de imagen (fetch, hash, EXIF, C2PA) vive en el **side
+  panel**, no en el service worker. Se intentó primero en el service
+  worker y se encontraron, en este orden, tres restricciones reales de la
+  plataforma (no de configuración):
+  1. `import()` dinámico está prohibido por especificación dentro de un
+     `ServiceWorkerGlobalScope`.
+  2. Crear un `Worker` también está prohibido ahí — y
+     `@contentauth/c2pa-web` siempre delega su trabajo de WASM a un
+     Worker, sin modo alternativo.
+  3. Compilar WebAssembly requiere `'wasm-unsafe-eval'` en el
+     `content_security_policy` del manifest (no viene permitido por
+     defecto en MV3).
+
+  El side panel es una página normal (ya usa su propio Worker de `pdf.js`
+  para leer PDFs), así que ahí sí funciona. `sidepanel/image-analyzer.ts`
+  + `sidepanel/c2pa-client.ts` hacen el trabajo real; el service worker
+  vuelve a ser mínimo (solo habilita el side panel al hacer clic).
+
+  Un intento posterior de pasar una URL de worker explícita (`workerSrc`)
+  para evitar depender de `blob:` falló porque la librería exige que sea
+  `https:`, imposible para un origen `chrome-extension://`. Y añadir
+  `blob:` a `worker-src` en el CSP del manifest **tampoco es válido**: MV3
+  rechaza cargar la extensión entera si lo intentas — es una restricción
+  dura, no configurable. La solución final: no pasar `workerSrc` en
+  absoluto y dejar que la librería cree su propio worker `blob:`, que sí
+  está permitido bajo el CSP por defecto de una página de extensión.
+
+- `manifest.json`: `host_permissions: ["<all_urls>"]` (fetch cross-origin
+  de imágenes) y `content_security_policy` con `'wasm-unsafe-eval'`.
+- Side panel: tarjeta independiente por imagen (score propio, nunca
+  mezclado con el del texto), reutilizando el mismo `renderResult` del
+  Capítulo 2.
+
+### Verificado con imágenes C2PA reales
+
+`test-pages/image-analysis.html` incluye tres imágenes con C2PA firmado
+de verdad (no simulacros), de repositorios públicos con licencia abierta:
+una de Adobe y una de Truepic (`c2pa-org/public-testfiles`), y una de las
+fixtures de test del propio SDK de referencia (`contentauth/c2pa-rs`).
+Con ellas se depuró el pipeline completo contra un navegador real hasta
+confirmar que EXIF y C2PA se leen, verifican y explican correctamente.
+
+### Qué NO cambió
+
+- El texto (Capítulos 1 y 2) sigue exactamente igual — la fusión por
+  niveles es idéntica byte a byte al promedio de siempre cuando no hay
+  evidencia dura de por medio.
+- Sigue sin haber backend: todo el análisis de imagen corre en la propia
+  extensión, sin enviar ninguna imagen a servidores externos.
