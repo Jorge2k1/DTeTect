@@ -1,4 +1,4 @@
-import { extractVisibleText } from '../content-scripts/extractor';
+import { extractVisibleText } from '../content-scripts/text/extractor';
 
 export const SUPPORTED_FILE_EXTENSIONS = ['.txt', '.md', '.markdown', '.html', '.htm', '.docx', '.pdf'];
 

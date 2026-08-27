@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Prueba — texto + imágenes con C2PA</title>
+  </head>
+  <body>
+    <nav><a href="#">Inicio</a> <a href="#">Archivo</a> <a href="#">Contacto</a></nav>
+
+    <article>
+      <h1>Vuelta al pueblo</h1>
+      <p>
+        Ayer volví al pueblo después de casi diez años. La casa de mis abuelos seguía en pie,
+        aunque el tejado se había hundido un poco por el lado norte. Entré. Olía a humedad y a
+        madera vieja, ese olor que nunca se me olvidó del todo.
+      </p>
+      <p>
+        Encontré, debajo de una manta apolillada, un cuaderno con dibujos que hice cuando tenía
+        siete años; algunos eran de dinosaurios imposibles, con demasiadas patas y colas
+        bifurcadas, otros eran mapas de un tesoro que nunca existió pero que yo defendía con
+        total convicción ante cualquiera que se atreviera a dudarlo. Me senté en el suelo, entre
+        el polvo y los recuerdos, y estuve ahí un buen rato sin hacer nada, solo mirando.
+      </p>
+      <p>
+        Después salí al patio. La higuera seguía creciendo torcida, como siempre, empujando una
+        de las tejas del cobertizo. Recogí dos higos maduros y me los comí sentado en el escalón
+        de piedra donde mi abuelo solía fumar en pipa mientras contaba historias que
+        probablemente se inventaba sobre la marcha.
+      </p>
+    </article>
+
+    <article>
+      <h2>Imágenes de prueba (C2PA real)</h2>
+      <p>
+        Las dos imágenes de abajo vienen del repositorio oficial de test-files de C2PA
+        (<code>c2pa-org/public-testfiles</code> en GitHub, licencia CC BY-SA), usado por los
+        propios validadores de C2PA para sus pruebas. Cada una tiene un manifiesto C2PA real,
+        firmado de verdad — no son simulacros.
+      </p>
+
+      <h3>1. Adobe — manifiesto C2PA firmado</h3>
+      <img
+        src="https://raw.githubusercontent.com/c2pa-org/public-testfiles/main/legacy/1.4/image/jpeg/adobe-20220124-C.jpg"
+        alt="Imagen de prueba de Adobe con manifiesto C2PA"
+        width="400"
+      />
+
+      <h3>2. Truepic — C2PA + EXIF real de cámara (Google Pixel 5)</h3>
+      <img
+        src="https://raw.githubusercontent.com/c2pa-org/public-testfiles/main/legacy/1.4/image/jpeg/truepic-20230212-camera.jpg"
+        alt="Fotografía de prueba de Truepic con C2PA y EXIF de cámara real"
+        width="400"
+      />
+
+      <h3>3. c2pa-rs — manifiesto C2PA con digitalSourceType "algorithmicMedia"</h3>
+      <p>
+        De las fixtures de test del propio SDK de referencia en Rust
+        (<code>contentauth/c2pa-rs</code>, licencia Apache-2.0/MIT). A diferencia de las dos
+        anteriores, su manifiesto declara explícitamente el origen del contenido.
+      </p>
+      <img
+        src="https://raw.githubusercontent.com/contentauth/c2pa-rs/main/sdk/tests/fixtures/C.jpg"
+        alt="Imagen de prueba de c2pa-rs con digitalSourceType declarado"
+        width="400"
+      />
+    </article>
+
+    <footer>© Diario personal</footer>
+  </body>
+</html>

@@ -10,6 +10,7 @@ import {
   stubPerplexitySignal,
 } from '@eas/core';
 import { getExtension, readFileAsText, SUPPORTED_FILE_EXTENSIONS } from './file-readers';
+import { analyzeImage } from './image-analyzer';
 
 const SIGNAL_LABELS: Record<SignalName, string> = {
   burstiness: 'Variación de longitud de frase (burstiness)',
@@ -126,6 +127,72 @@ function renderResult(panel: PanelElements, statusMessage: string, evidence: Evi
   panel.evidenceList?.replaceChildren(...ranked.map(buildEvidenceItem));
 }
 
+// --- Imágenes de la página actual ------------------------------------
+
+/**
+ * Una tarjeta independiente por imagen, cada una con su propio score —
+ * nunca se mezclan entre sí ni con el texto de la página (fuse() se llama
+ * una vez por sujeto, no una vez para toda la página). Reutiliza
+ * renderResult construyendo un PanelElements "de mentira" apuntando a los
+ * elementos internos de la tarjeta, en vez de duplicar la lógica de
+ * pintado de score/evidencias.
+ */
+const imageCardsContainer = document.querySelector<HTMLElement>('#dom-image-cards');
+const imageEmptyEl = document.querySelector<HTMLElement>('#dom-image-empty');
+const imageCards = new Map<string, { container: HTMLElement; panel: PanelElements }>();
+
+function buildImageCardSkeleton(sourceId: string): { container: HTMLElement; panel: PanelElements } {
+  const container = document.createElement('div');
+  container.className = 'image-card';
+
+  const thumb = document.createElement('img');
+  thumb.className = 'image-card-thumb';
+  thumb.src = sourceId;
+  thumb.alt = '';
+  thumb.loading = 'lazy';
+
+  const status = document.createElement('p');
+  status.className = 'status';
+
+  const scoreRow = document.createElement('div');
+  scoreRow.className = 'image-card-score-row';
+  const score = document.createElement('div');
+  score.className = 'score-value image-card-score';
+  const confidence = document.createElement('div');
+  confidence.className = 'confidence-label';
+  scoreRow.append(score, confidence);
+
+  const summary = document.createElement('p');
+  summary.className = 'image-card-summary';
+
+  const evidenceList = document.createElement('ul');
+  evidenceList.className = 'evidence-list';
+
+  container.append(thumb, status, scoreRow, summary, evidenceList);
+
+  return { container, panel: { status, score, confidence, summary, evidenceList } };
+}
+
+function renderImageEvidence(sourceId: string, evidence: Evidence[]): void {
+  if (!imageCardsContainer) return;
+
+  let card = imageCards.get(sourceId);
+  if (!card) {
+    card = buildImageCardSkeleton(sourceId);
+    imageCards.set(sourceId, card);
+    imageCardsContainer.append(card.container);
+  }
+
+  if (imageEmptyEl) imageEmptyEl.hidden = imageCards.size > 0;
+  renderResult(card.panel, 'Imagen analizada', evidence);
+}
+
+function clearImageCards(): void {
+  imageCards.clear();
+  imageCardsContainer?.replaceChildren();
+  if (imageEmptyEl) imageEmptyEl.hidden = false;
+}
+
 // --- Pestaña "Página actual" ---------------------------------------------
 
 async function getActiveTabId(): Promise<number | undefined> {
@@ -146,6 +213,7 @@ async function requestExtraction(tabId: number): Promise<string | undefined> {
 
 async function runDomAnalysis(): Promise<void> {
   renderLoading(domPanel, 'Analizando contenido visible…');
+  clearImageCards();
 
   const tabId = await getActiveTabId();
   if (tabId === undefined) {
@@ -166,6 +234,12 @@ async function runDomAnalysis(): Promise<void> {
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === 'EAS_CONTENT_UPDATED') {
     void runDomAnalysis();
+  }
+  // El análisis de imagen (fetch + EXIF + C2PA) corre aquí mismo, en el
+  // side panel, no en el service worker: @contentauth/c2pa-web necesita
+  // crear un Worker, y eso está prohibido dentro de un service worker.
+  if (message?.type === 'EAS_IMAGE_DETECTED') {
+    void analyzeImage(message.url, renderImageEvidence);
   }
 });
 

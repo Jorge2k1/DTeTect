@@ -20,21 +20,30 @@
       </header>
 
       <section class="tab-panel" data-tab-panel="dom">
-        <p id="dom-status" class="status">Analizando contenido visible…</p>
+        <section class="subject">
+          <h2 class="subject-title">Texto de la página</h2>
+          <p id="dom-status" class="status">Analizando contenido visible…</p>
 
-        <section class="score-card">
-          <div id="dom-score" class="score-value">—</div>
-          <div id="dom-confidence" class="confidence-label">Confianza del análisis: —</div>
+          <section class="score-card">
+            <div id="dom-score" class="score-value">—</div>
+            <div id="dom-confidence" class="confidence-label">Confianza del análisis: —</div>
+          </section>
+
+          <section class="summary">
+            <h3>Resumen</h3>
+            <p id="dom-summary"></p>
+          </section>
+
+          <section class="evidence">
+            <h3>Evidencias</h3>
+            <ul id="dom-evidence-list" class="evidence-list"></ul>
+          </section>
         </section>
 
-        <section class="summary">
-          <h2>Resumen</h2>
-          <p id="dom-summary"></p>
-        </section>
-
-        <section class="evidence">
-          <h2>Evidencias</h2>
-          <ul id="dom-evidence-list" class="evidence-list"></ul>
+        <section class="subject">
+          <h2 class="subject-title">Imágenes de la página</h2>
+          <p id="dom-image-empty" class="status">Ninguna imagen relevante detectada todavía.</p>
+          <div id="dom-image-cards" class="image-cards"></div>
         </section>
       </section>
 

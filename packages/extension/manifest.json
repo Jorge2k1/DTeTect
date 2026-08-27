@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "description": "Analiza el contenido visible de la pestaña activa y calcula un score de confianza explicado, sin enviar datos a servidores externos.",
   "permissions": ["activeTab", "scripting", "sidePanel"],
+  "host_permissions": ["<all_urls>"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "background": {
     "service_worker": "background/service-worker.ts",
     "type": "module"
@@ -17,7 +21,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content-scripts/content-script.ts"],
+      "js": ["content-scripts/text/content-script.ts", "content-scripts/image/image-extractor.ts"],
       "run_at": "document_idle"
     }
   ]

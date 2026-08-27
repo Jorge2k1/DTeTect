@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Evidence } from '../signals/types';
-import { fuse } from './fusion-engine';
+import { DEFAULT_SIGNAL_WEIGHTS, fuse } from './fusion-engine';
 
 function makeEvidence(overrides: Partial<Evidence>): Evidence {
   return {
@@ -50,5 +50,51 @@ describe('fuse', () => {
       { burstiness: 1, perplexity: 5 }
     );
     expect(result.score).toBeLessThan(0.5);
+  });
+
+  describe('evidencia dura (C2PA) frente a evidencia blanda', () => {
+    it('un C2PA válido domina la dirección aunque haya mucha evidencia blanda en contra', () => {
+      const result = fuse([
+        makeEvidence({ signal: 'c2pa-provenance', modality: 'image', contribution: 1, confidence: 1 }),
+        makeEvidence({ signal: 'burstiness', contribution: -1, confidence: 1 }),
+        makeEvidence({ signal: 'lexical-diversity-mattr', contribution: -1, confidence: 1 }),
+        makeEvidence({ signal: 'ngram-repetition', contribution: -1, confidence: 1 }),
+        makeEvidence({ signal: 'perplexity', contribution: -1, confidence: 1 }),
+      ]);
+      // Con el promedio plano de antes esto daba ~52% (casi neutro). Con
+      // fusión por niveles debe quedar cerca del máximo, solo matizado.
+      expect(result.score).toBeGreaterThan(0.85);
+    });
+
+    it('sin evidencia dura, el comportamiento es idéntico al promedio ponderado de la Fase 1', () => {
+      const evidence = [
+        makeEvidence({ signal: 'burstiness', contribution: 0.5, confidence: 0.8 }),
+        makeEvidence({ signal: 'lexical-diversity-mattr', contribution: -0.3, confidence: 1 }),
+        makeEvidence({ signal: 'ngram-repetition', contribution: 0.2, confidence: 0.6 }),
+      ];
+      const result = fuse(evidence);
+
+      let weightedContribution = 0;
+      let weightedConfidence = 0;
+      for (const item of evidence) {
+        const w = DEFAULT_SIGNAL_WEIGHTS[item.signal] * item.confidence;
+        weightedContribution += item.contribution * w;
+        weightedConfidence += w;
+      }
+      const expectedScore = (weightedContribution / weightedConfidence + 1) / 2;
+
+      expect(result.score).toBeCloseTo(expectedScore, 10);
+    });
+
+    it('EXIF por sí solo (sin C2PA) actúa como evidencia blanda, no domina la dirección', () => {
+      const result = fuse([
+        makeEvidence({ signal: 'exif-metadata', modality: 'image', contribution: 1, confidence: 1 }),
+        makeEvidence({ signal: 'burstiness', contribution: -1, confidence: 1 }),
+        makeEvidence({ signal: 'lexical-diversity-mattr', contribution: -1, confidence: 1 }),
+      ]);
+      // EXIF pesa más que una señal de texto sola, pero sigue siendo un
+      // voto entre otros: no debe acercarse al máximo como sí hace C2PA.
+      expect(result.score).toBeLessThan(0.85);
+    });
   });
 });
