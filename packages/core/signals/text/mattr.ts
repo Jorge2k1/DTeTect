@@ -63,6 +63,7 @@ export const mattrSignal: TextSignal = {
     return {
       signal: 'lexical-diversity-mattr',
       modality: 'text',
+      aspect: mattr < NEUTRAL_MATTR ? 'Vocabulario poco variado' : 'Vocabulario variado',
       value: mattr,
       confidence,
       contribution,

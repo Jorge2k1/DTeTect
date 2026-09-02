@@ -12,6 +12,12 @@ export interface ImageBytes {
   sourceId: string;
   /** MIME type si se conoce (p. ej. desde la respuesta del fetch). */
   mimeType?: string;
+  /**
+   * Texto asociado a la imagen en la página de origen (alt, title,
+   * figcaption), si el content script lo capturó. No todas las señales lo
+   * usan — solo context-text.ts.
+   */
+  context?: string;
 }
 
 /**

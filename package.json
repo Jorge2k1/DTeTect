@@ -8,6 +8,7 @@
   "scripts": {
     "test": "npm run test --workspaces --if-present",
     "build:extension": "npm run build --workspace=@eas/extension",
-    "typecheck": "tsc -p packages/core --noEmit && npm run typecheck --workspace=@eas/extension"
+    "typecheck": "tsc -p packages/core --noEmit && npm run typecheck --workspace=@eas/extension",
+    "inspect:image": "node scripts/inspect-image-metadata.mjs"
   }
 }

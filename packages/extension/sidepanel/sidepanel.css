@@ -219,7 +219,7 @@ body {
   background: color-mix(in srgb, var(--border) 25%, transparent);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .evidence-item[data-direction='ai'] {
@@ -230,6 +230,19 @@ body {
   border-left-color: var(--human);
 }
 
+/*
+ * Etiqueta de categoría (nombre fijo de la señal, p. ej. "Procedencia
+ * C2PA") — deliberadamente pequeña y muted: es contexto de fondo, no lo
+ * primero que hay que leer. Lo primero es evidence-aspect, más abajo.
+ */
+.evidence-category {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
 .evidence-head {
   display: flex;
   justify-content: space-between;
@@ -238,8 +251,10 @@ body {
   font-weight: 600;
 }
 
-.evidence-name {
-  font-size: 12px;
+/* El atributo concreto detectado (Evidence.aspect) — lo más destacado del
+   item, para que se entienda de un vistazo a qué se refiere la barra. */
+.evidence-aspect {
+  font-size: 13px;
 }
 
 .evidence-pct {
@@ -288,12 +303,83 @@ body {
   background: var(--human);
 }
 
+/*
+ * Plegado por defecto: con varias evidencias a la vez, mostrar siempre la
+ * frase completa de cada una saturaba la vista. La etiqueta de categoría +
+ * el aspecto + la barra ya comunican lo esencial de un vistazo; el
+ * razonamiento completo queda a un clic para quien quiera profundizar.
+ */
+.evidence-details {
+  margin-top: 2px;
+}
+
+.evidence-details summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+}
+
+.evidence-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.evidence-details summary::before {
+  content: '▸ ';
+}
+
+.evidence-details[open] summary::before {
+  content: '▾ ';
+}
+
 .evidence-text {
-  margin: 0;
+  margin: 6px 0 0;
+}
+
+/*
+ * Desglose atributo por atributo (Evidence.details) — un guion por dato
+ * crudo concreto (p. ej. "Firma criptográfica: No válida"), para que una
+ * conclusión como "no es de fiar" venga acompañada de qué campo exacto la
+ * causó, no solo de la frase en prosa.
+ */
+.evidence-attributes {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evidence-attributes li {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.evidence-attributes li::before {
+  content: '–';
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.evidence-attribute-label {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.evidence-attribute-label::after {
+  content: ':';
+}
+
+.evidence-attribute-value {
+  font-weight: 600;
 }
 
 .evidence-meta {
-  margin: 0;
+  margin: 4px 0 0;
   font-size: 11px;
   color: var(--muted);
 }

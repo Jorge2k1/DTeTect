@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <title>Prueba — texto + imágenes con C2PA</title>
+    <title>Prueba — texto + imágenes (EXIF, C2PA, XMP, URL, contexto)</title>
   </head>
   <body>
     <nav><a href="#">Inicio</a> <a href="#">Archivo</a> <a href="#">Contacto</a></nav>
@@ -30,37 +30,104 @@
     </article>
 
     <article>
-      <h2>Imágenes de prueba (C2PA real)</h2>
+      <h2>Imágenes de prueba — 5 escenarios, cada uno pensado para ejercitar una combinación
+        distinta de señales</h2>
       <p>
-        Las dos imágenes de abajo vienen del repositorio oficial de test-files de C2PA
-        (<code>c2pa-org/public-testfiles</code> en GitHub, licencia CC BY-SA), usado por los
-        propios validadores de C2PA para sus pruebas. Cada una tiene un manifiesto C2PA real,
-        firmado de verdad — no son simulacros.
+        Todas las imágenes son reales y verificables: dos se descargan en directo de
+        repositorios públicos con licencia abierta (<code>c2pa-org/public-testfiles</code> para
+        Truepic, <code>contentauth/c2pa-rs</code> para el <code>C.jpg</code> del escenario 2), y
+        tres son copias locales — dos de ellas (escenarios 3 y 5) de otra imagen de test de
+        Adobe (<code>adobe-20220124-C.jpg</code>, también de <code>c2pa-org/public-testfiles</code>,
+        distinta de la del escenario 2) y una (escenario 4) de la misma imagen de Truepic del
+        escenario 1 — con metadatos añadidos a propósito para poder probar
+        EXIF/C2PA/XMP/URL/contexto a la vez. Nada de datos simulados: son bytes JPEG y XMP
+        reales y válidos, verificados con <code>exifr</code> antes de usarlos aquí.
       </p>
 
-      <h3>1. Adobe — manifiesto C2PA firmado</h3>
-      <img
-        src="https://raw.githubusercontent.com/c2pa-org/public-testfiles/main/legacy/1.4/image/jpeg/adobe-20220124-C.jpg"
-        alt="Imagen de prueba de Adobe con manifiesto C2PA"
-        width="400"
-      />
-
-      <h3>2. Truepic — C2PA + EXIF real de cámara (Google Pixel 5)</h3>
+      <h3>Escenario 1 — Todo apunta a humano</h3>
+      <p>
+        <strong>Truepic</strong> (verificación de cámara real). EXIF real de cámara (Google
+        Pixel 5, GPS) → <em>exif-metadata</em> hacia humano. C2PA firmado y válido, pero sin
+        declarar <code>digitalSourceType</code> → <em>c2pa-provenance</em> inclina levemente
+        hacia humano (evidencia dura, domina el resultado). Sin XMP, sin coincidencias de
+        URL/nombre, sin declaración en el contexto. <strong>Resultado esperado: score bajo.</strong>
+      </p>
       <img
         src="https://raw.githubusercontent.com/c2pa-org/public-testfiles/main/legacy/1.4/image/jpeg/truepic-20230212-camera.jpg"
-        alt="Fotografía de prueba de Truepic con C2PA y EXIF de cámara real"
+        alt="Fotografía de Truepic con EXIF de cámara real y C2PA válido"
         width="400"
       />
 
-      <h3>3. c2pa-rs — manifiesto C2PA con digitalSourceType "algorithmicMedia"</h3>
+      <h3>Escenario 2 — C2PA declara origen de IA explícitamente</h3>
       <p>
-        De las fixtures de test del propio SDK de referencia en Rust
-        (<code>contentauth/c2pa-rs</code>, licencia Apache-2.0/MIT). A diferencia de las dos
-        anteriores, su manifiesto declara explícitamente el origen del contenido.
+        De las fixtures de test del propio SDK de referencia en Rust (<code>c2pa-rs</code>). Su
+        manifiesto declara <code>digitalSourceType: algorithmicMedia</code> → evidencia dura
+        firmada, domina el resultado casi al máximo. <strong>Resultado esperado: score muy
+        alto.</strong>
       </p>
       <img
         src="https://raw.githubusercontent.com/contentauth/c2pa-rs/main/sdk/tests/fixtures/C.jpg"
         alt="Imagen de prueba de c2pa-rs con digitalSourceType declarado"
+        width="400"
+      />
+
+      <h3>Escenario 3 — Señales blandas hacia IA, pero la evidencia dura las contiene</h3>
+      <p>
+        Copia local de otra imagen de test C2PA de Adobe — distinta de la del escenario 2,
+        del mismo repositorio que la de Truepic (<code>adobe-20220124-C.jpg</code>): C2PA
+        firmado y válido pero sin <code>digitalSourceType</code> declarado → leve hacia
+        humano, evidencia <strong>dura</strong>, igual que en el escenario 1 — renombrada a
+        un patrón típico de DALL·E sin renombrar
+        (<em>image-url-heuristics</em> hacia IA) y con un pie de foto que declara
+        explícitamente origen de IA (<em>image-context-text</em> hacia IA, la más fuerte de las
+        dos). Las dos apuntan a IA, pero son evidencia <strong>blanda</strong> — circunstancial,
+        fácil de montar o de evitar. <strong>Resultado esperado: el score se queda cerca de
+        donde lo deja C2PA (hacia humano), NO se dispara hacia IA solo por el nombre del
+        archivo o el pie de foto</strong> — así es como debe comportarse la fusión por niveles.
+      </p>
+      <figure>
+        <img
+          src="assets/DALL-E 2024-01-01 - ejemplo ambiguo.jpg"
+          alt="Imagen de prueba con nombre de archivo estilo DALL-E"
+          width="400"
+        />
+        <figcaption>Esta ilustración fue generada por IA a modo de ejemplo para esta página.</figcaption>
+      </figure>
+
+      <h3>Escenario 4 — XMP declara IA, pero sin firmar: no pesa como C2PA</h3>
+      <p>
+        Copia local de la imagen de Truepic del escenario 1 (mismo EXIF real de cámara, mismo
+        C2PA válido-pero-ambiguo, evidencia <strong>dura</strong> hacia humano) con un bloque
+        XMP añadido que declara <code>digitalSourceType: trainedAlgorithmicMedia</code> y
+        <code>CreatorTool: "Demo Generative Tool 1.0"</code> — sin firma criptográfica, a
+        diferencia de C2PA. <strong>Resultado esperado: XMP empuja con fuerza hacia IA, pero al
+        ser evidencia blanda (aunque explícita) no puede ganarle a la evidencia dura de C2PA,
+        que sigue dominando el resultado hacia humano</strong> — la misma lección del escenario
+        3, esta vez con una señal aún más "concluyente" en apariencia.
+      </p>
+      <img
+        src="assets/truepic-with-xmp-ai.jpg"
+        alt="Fotografía de Truepic con un bloque XMP añadido que declara origen de IA"
+        width="400"
+      />
+
+      <h3>Escenario 5 — nombrar la herramienta sin declaración formal (EXIF + contexto)</h3>
+      <p>
+        Copia local de la misma imagen de Adobe del escenario 3 (<code>adobe-20220124-C.jpg</code>,
+        C2PA válido-pero-ambiguo, sin <code>digitalSourceType</code>) con
+        el campo EXIF <code>Software</code> añadido a <code>"Midjourney 6.1"</code> — sin decir
+        "generado por IA" en ningún sitio, solo nombrando la herramienta. El <code>alt</code>
+        de abajo hace lo mismo a nivel de contexto de página: menciona la herramienta sin
+        declaración explícita. Esto ejercita específicamente la rama
+        <code>matchesKnownTool</code> de <em>exif-metadata</em> y de
+        <em>image-context-text</em> — la que faltaba por probar en vivo (antes solo cubierta
+        por tests unitarios). Mira el desglose por señal, no solo el score global: aquí importa
+        comprobar que <strong>ambas</strong> señales reconocen el nombre de la herramienta por
+        separado.
+      </p>
+      <img
+        src="assets/adobe-with-exif-software.jpg"
+        alt="Prompt experimentado en Midjourney para esta pieza"
         width="400"
       />
     </article>

@@ -6,6 +6,7 @@ function makeEvidence(overrides: Partial<Evidence>): Evidence {
   return {
     signal: 'burstiness',
     modality: 'text',
+    aspect: '',
     value: 0,
     confidence: 1,
     contribution: 0,

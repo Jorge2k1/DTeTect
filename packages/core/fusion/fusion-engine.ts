@@ -11,9 +11,9 @@ export interface FusionResult {
 }
 
 /**
- * Pesos por tipo de señal. La evidencia dura (procedencia, V2) pesa mucho
- * más que la evidencia blanda (patrones lingüísticos, Fase 1) porque es
- * casi determinista frente a estadística.
+ * Pesos por tipo de señal. La evidencia dura (procedencia, C2PA) pesa
+ * mucho más que la evidencia blanda (patrones lingüísticos, metadatos sin
+ * firma) porque es casi determinista frente a estadística/circunstancial.
  *
  * Dentro de la evidencia blanda, lexical-diversity-mattr pesa menos que
  * las demás: en textos técnicos/informativos (humanos o de IA) la
@@ -22,6 +22,14 @@ export interface FusionResult {
  * tres cuando actúan solas. burstiness y ngram-repetition acertaron la
  * dirección en todos los textos de referencia probados (ver
  * calibration.test.ts) y por eso pesan más.
+ *
+ * Entre las señales de imagen: xmp-metadata es el mismo campo que
+ * c2pa-provenance (digitalSourceType) pero sin firma criptográfica —
+ * pesa menos por eso, no porque el campo en sí sea menos informativo.
+ * image-url-heuristics e image-context-text son circunstanciales
+ * (nombre de archivo, dominio, texto que alguien escribió) — fáciles de
+ * evitar con solo cambiar el nombre del archivo o no escribir un aviso,
+ * así que pesan poco incluso cuando aciertan.
  */
 export const DEFAULT_SIGNAL_WEIGHTS: Record<SignalName, number> = {
   burstiness: 1.6,
@@ -30,6 +38,9 @@ export const DEFAULT_SIGNAL_WEIGHTS: Record<SignalName, number> = {
   perplexity: 1.5,
   'c2pa-provenance': 5,
   'exif-metadata': 3,
+  'xmp-metadata': 4,
+  'image-url-heuristics': 1.2,
+  'image-context-text': 2,
 };
 
 /**

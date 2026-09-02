@@ -55,6 +55,7 @@ export const ngramRepetitionSignal: TextSignal = {
     return {
       signal: 'ngram-repetition',
       modality: 'text',
+      aspect: repetitionRatio > BASELINE_REPETITION_RATIO ? 'Repetición de secuencias de palabras' : 'Sin repetición anómala',
       value: repetitionRatio,
       confidence,
       contribution,

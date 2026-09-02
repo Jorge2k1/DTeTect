@@ -1,4 +1,5 @@
 import type { Evidence } from '../types';
+import { classifyDigitalSourceType } from './iptc-digital-source-type';
 import { matchesKnownAiSoftware } from './known-ai-tools';
 
 /**
@@ -27,76 +28,87 @@ export interface C2paCheckResult {
 }
 
 /**
- * Vocabulario IPTC de digitalSourceType (http://cv.iptc.org/newscodes/digitalsourcetype/).
- * Deliberadamente no se incluyen valores ambiguos como "digitalArt",
- * "digitalCreation", "softwareImage" o "screenCapture" — pueden ser 100%
- * obra humana (arte digital dibujado a mano, capturas de pantalla) y no
- * dicen nada fiable sobre IA vs. humano; se quedan en el caso neutro.
+ * El valor crudo de digitalSourceType es una URL completa del vocabulario
+ * IPTC (p. ej. "http://cv.iptc.org/newscodes/digitalsourcetype/
+ * algorithmicMedia") — para mostrarlo como atributo legible en la UI basta
+ * el último segmento, que es el término real del vocabulario.
  */
-const AI_SOURCE_TYPES = [
-  'trainedAlgorithmicMedia',
-  'compositeWithTrainedAlgorithmicMedia',
-  'algorithmicMedia',
-  'dataDrivenMedia',
-  'compositeSynthetic',
-];
-const CAMERA_SOURCE_TYPES = [
-  'digitalCapture',
-  'negativeFilm',
-  'positiveFilm',
-  'print',
-  'computationalCapture',
-  'compositeCapture',
-];
+function shortDigitalSourceType(digitalSourceType: string | undefined): string {
+  if (!digitalSourceType) return '(ninguno)';
+  return digitalSourceType.split('/').pop() || digitalSourceType;
+}
 
-function matchesAny(digitalSourceType: string | undefined, needles: string[]): boolean {
-  return digitalSourceType !== undefined && needles.some((needle) => digitalSourceType.includes(needle));
+function claimGeneratorDetail(claimGenerator: string | undefined): { label: string; value: string } {
+  return { label: 'Generador declarado (claimGenerator)', value: claimGenerator ?? '(no especificado)' };
 }
 
 export function mapC2paResultToEvidence(result: C2paCheckResult, sourceId: string): Evidence {
+  const sourceTypeClass = classifyDigitalSourceType(result.digitalSourceType);
   const base = { signal: 'c2pa-provenance' as const, modality: 'image' as const, sourceId };
 
   if (!result.manifestFound) {
     return {
       ...base,
+      aspect: 'Sin manifiesto C2PA',
       value: 0,
       confidence: 0.1,
       contribution: 0.05,
       humanReadable:
         'La imagen no tiene manifiesto C2PA — no aporta ni descarta nada por sí solo, la mayoría de imágenes hoy no lo tienen.',
+      details: [{ label: 'Manifiesto C2PA', value: 'No encontrado en el archivo' }],
     };
   }
 
   if (!result.signatureValid) {
     return {
       ...base,
+      aspect: 'Firma C2PA inválida',
       value: 0,
       confidence: 0.5,
       contribution: 0.3,
       humanReadable:
         'La imagen tiene un manifiesto C2PA pero su firma no es válida — el historial de procedencia no es de fiar.',
+      details: [
+        { label: 'Manifiesto C2PA', value: 'Encontrado' },
+        {
+          label: 'Firma criptográfica',
+          value: 'No válida — no coincide con el contenido o no la emitió una autoridad de confianza',
+        },
+      ],
     };
   }
 
-  if (matchesAny(result.digitalSourceType, AI_SOURCE_TYPES)) {
+  if (sourceTypeClass === 'ai') {
     return {
       ...base,
+      aspect: 'Origen declarado: IA',
       value: 1,
       confidence: 0.98,
       contribution: 0.98,
       humanReadable: `Manifiesto C2PA firmado y válido: declara origen generado por IA${
         result.claimGenerator ? ` (${result.claimGenerator})` : ''
       }.`,
+      details: [
+        { label: 'Firma criptográfica', value: 'Válida' },
+        { label: 'digitalSourceType declarado', value: shortDigitalSourceType(result.digitalSourceType) },
+        claimGeneratorDetail(result.claimGenerator),
+      ],
     };
   }
 
-  if (matchesAny(result.digitalSourceType, CAMERA_SOURCE_TYPES)) {
+  if (sourceTypeClass === 'camera') {
     return {
       ...base,
+      aspect: 'Origen declarado: cámara',
       value: 1,
       confidence: 0.98,
       contribution: -0.98,
       humanReadable: 'Manifiesto C2PA firmado y válido: declara origen de captura por cámara real.',
+      details: [
+        { label: 'Firma criptográfica', value: 'Válida' },
+        { label: 'digitalSourceType declarado', value: shortDigitalSourceType(result.digitalSourceType) },
+        claimGeneratorDetail(result.claimGenerator),
+      ],
     };
   }
 
@@ -110,20 +122,32 @@ export function mapC2paResultToEvidence(result: C2paCheckResult, sourceId: strin
   if (matchesKnownAiSoftware(result.claimGenerator)) {
     return {
       ...base,
+      aspect: 'Herramienta de IA (sin declarar origen)',
       value: 0.7,
       confidence: 0.5,
       contribution: 0.6,
       humanReadable: `Manifiesto C2PA firmado y válido, creado con "${result.claimGenerator}" — herramienta asociada a generación de imagen por IA, aunque el manifiesto no declara el origen de forma explícita.`,
+      details: [
+        { label: 'Firma criptográfica', value: 'Válida' },
+        { label: 'digitalSourceType declarado', value: shortDigitalSourceType(result.digitalSourceType) },
+        { label: 'Generador declarado (claimGenerator)', value: `${result.claimGenerator} — coincide con herramienta de IA conocida` },
+      ],
     };
   }
 
   return {
     ...base,
+    aspect: 'Sin origen declarado',
     value: 0.4,
     confidence: 0.4,
     contribution: -0.2,
     humanReadable: `Manifiesto C2PA firmado y válido${
       result.claimGenerator ? ` (creado con ${result.claimGenerator})` : ''
     }, pero no declara el origen del contenido de forma concluyente — la ausencia de esa declaración es un indicio débil, no una prueba, de que probablemente no es contenido generado por IA.`,
+    details: [
+      { label: 'Firma criptográfica', value: 'Válida' },
+      { label: 'digitalSourceType declarado', value: shortDigitalSourceType(result.digitalSourceType) },
+      claimGeneratorDetail(result.claimGenerator),
+    ],
   };
 }

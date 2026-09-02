@@ -76,6 +76,7 @@ export const burstinessSignal: TextSignal = {
     return {
       signal: 'burstiness',
       modality: 'text',
+      aspect: burstiness < NEUTRAL_BURSTINESS_CV ? 'Frases de longitud uniforme' : 'Frases de longitud variable',
       value: burstiness,
       confidence,
       contribution,

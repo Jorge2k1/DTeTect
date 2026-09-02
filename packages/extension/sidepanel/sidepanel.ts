@@ -19,6 +19,9 @@ const SIGNAL_LABELS: Record<SignalName, string> = {
   perplexity: 'Perplexity',
   'c2pa-provenance': 'Procedencia C2PA',
   'exif-metadata': 'Metadatos EXIF',
+  'xmp-metadata': 'Metadatos XMP',
+  'image-url-heuristics': 'Patrón de URL/nombre de archivo',
+  'image-context-text': 'Texto de contexto (alt/pie de foto)',
 };
 
 interface PanelElements {
@@ -73,23 +76,38 @@ function formatPercent(ratio: number): string {
   return `${Math.round(ratio * 100)}%`;
 }
 
+/**
+ * Una misma señal (p. ej. "Procedencia C2PA") puede activar ramas muy
+ * distintas entre sí — sin manifiesto, firma inválida, origen de IA,
+ * origen de cámara... — así que el nombre de la señal por sí solo no basta
+ * para saber de un vistazo a qué atributo concreto se refiere la barra.
+ * item.aspect (ver Evidence en core/signals/types.ts) es ese atributo
+ * concreto, en 2-5 palabras: es lo primero y más destacado que se ve; el
+ * nombre de la señal pasa a ser una etiqueta de categoría secundaria, y la
+ * frase completa de humanReadable queda plegada en <details> para no
+ * saturar la vista con texto cuando hay varias evidencias a la vez.
+ */
 function buildEvidenceItem(item: RankedEvidence): HTMLLIElement {
   const li = document.createElement('li');
   li.className = 'evidence-item';
   li.dataset.direction = item.contribution >= 0 ? 'ai' : 'human';
 
+  const category = document.createElement('span');
+  category.className = 'evidence-category';
+  category.textContent = SIGNAL_LABELS[item.signal] ?? item.signal;
+
   const head = document.createElement('div');
   head.className = 'evidence-head';
 
-  const name = document.createElement('span');
-  name.className = 'evidence-name';
-  name.textContent = SIGNAL_LABELS[item.signal] ?? item.signal;
+  const aspect = document.createElement('span');
+  aspect.className = 'evidence-aspect';
+  aspect.textContent = item.aspect;
 
   const pct = document.createElement('span');
   pct.className = 'evidence-pct';
   pct.textContent = `${formatPercent(Math.abs(item.contribution))} ${item.contribution >= 0 ? 'hacia IA' : 'hacia humano'}`;
 
-  head.append(name, pct);
+  head.append(aspect, pct);
 
   const bar = document.createElement('div');
   bar.className = 'evidence-bar';
@@ -98,15 +116,45 @@ function buildEvidenceItem(item: RankedEvidence): HTMLLIElement {
   barFill.setAttribute('style', contributionBarStyle(item.contribution));
   bar.append(barFill);
 
+  const details = document.createElement('details');
+  details.className = 'evidence-details';
+  const summary = document.createElement('summary');
+  summary.textContent = 'Por qué';
   const text = document.createElement('p');
   text.className = 'evidence-text';
   text.textContent = item.humanReadable;
+  details.append(summary, text);
+
+  /**
+   * item.details (opcional) desglosa los datos crudos concretos que
+   * llevaron a esta conclusión — p. ej. para C2PA: si había manifiesto, si
+   * la firma era válida, qué digitalSourceType declaraba. Una frase en
+   * prosa como "el historial de procedencia no es de fiar" no dice qué
+   * atributo concreto falló; esta lista sí.
+   */
+  if (item.details && item.details.length > 0) {
+    const attributeList = document.createElement('ul');
+    attributeList.className = 'evidence-attributes';
+    for (const { label, value } of item.details) {
+      const li2 = document.createElement('li');
+      const labelEl = document.createElement('span');
+      labelEl.className = 'evidence-attribute-label';
+      labelEl.textContent = label;
+      const valueEl = document.createElement('span');
+      valueEl.className = 'evidence-attribute-value';
+      valueEl.textContent = value;
+      li2.append(labelEl, valueEl);
+      attributeList.append(li2);
+    }
+    details.append(attributeList);
+  }
 
   const meta = document.createElement('p');
   meta.className = 'evidence-meta';
   meta.textContent = `Confianza de esta señal: ${formatPercent(item.confidence)} · peso en el resultado: ${formatPercent(Math.abs(item.weightedImpact))}`;
+  details.append(meta);
 
-  li.append(head, bar, text, meta);
+  li.append(category, head, bar, details);
   return li;
 }
 
@@ -239,7 +287,7 @@ chrome.runtime.onMessage.addListener((message) => {
   // side panel, no en el service worker: @contentauth/c2pa-web necesita
   // crear un Worker, y eso está prohibido dentro de un service worker.
   if (message?.type === 'EAS_IMAGE_DETECTED') {
-    void analyzeImage(message.url, renderImageEvidence);
+    void analyzeImage(message.url, message.context, renderImageEvidence);
   }
 });
 

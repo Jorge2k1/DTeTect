@@ -24,6 +24,7 @@ export const stubPerplexitySignal: PerplexitySignal = {
     return {
       signal: 'perplexity',
       modality: 'text',
+      aspect: 'Señal no implementada',
       value: 0,
       confidence: 0,
       contribution: 0,
