@@ -9,6 +9,8 @@ pan de pipillas
 - [Capítulo 2 — Side panel: pestañas, desglose por señal y subida de archivos](#capítulo-2--side-panel-pestañas-desglose-por-señal-y-subida-de-archivos)
 - [Capítulo 3 — Intento de perplexity real (ONNX), aparcado](#capítulo-3--intento-de-perplexity-real-onnx-aparcado)
 - [Capítulo 4 — Fase 2: señales de imagen (EXIF + C2PA)](#capítulo-4--fase-2-señales-de-imagen-exif--c2pa)
+- [Capítulo 5 — Señales de imagen adicionales: XMP, URL y contexto de página](#capítulo-5--señales-de-imagen-adicionales-xmp-url-y-contexto-de-página)
+- [Capítulo 6 — UI: qué atributo concreto detectó cada evidencia](#capítulo-6--ui-qué-atributo-concreto-detectó-cada-evidencia)
 
 ---
 
@@ -398,3 +400,187 @@ confirmar que EXIF y C2PA se leen, verifican y explican correctamente.
   evidencia dura de por medio.
 - Sigue sin haber backend: todo el análisis de imagen corre en la propia
   extensión, sin enviar ninguna imagen a servidores externos.
+
+---
+
+## Capítulo 5 — Señales de imagen adicionales: XMP, URL y contexto de página
+
+Amplía la Fase 2 con tres señales más, todas sin ML ni análisis de
+píxeles. **Se descartó explícitamente** la vía de análisis de píxeles
+(artefactos de compresión, huellas de GAN, FFT, clasificador CNN) — es
+justo lo que el encargo original de la Fase 2 excluyó, y las razones
+siguen siendo válidas: no hay modelo ligero de confianza, los artefactos
+se destruyen con el procesamiento normal de la web (redimensionar,
+recomprimir), y un modelo propio o una API externa comprometerían la
+misma postura de compliance de todo el proyecto ("nada sale del
+navegador"). Ninguna señal nueva analiza contenido de píxeles.
+
+Las tres señales que sí se implementaron:
+
+### `xmp.ts` — el mismo campo que C2PA, sin firma
+
+Muchas herramientas (Photoshop, Lightroom, algunos generadores) escriben
+`digitalSourceType` en un bloque XMP incrustado en el archivo sin llegar
+a firmar un manifiesto C2PA completo. Verificado directamente: `exifr`
+(ya en uso para EXIF) ignora XMP por defecto — hace falta la opción
+`{xmp: true}` explícita, sin la cual una imagen con XMP pero sin EXIF
+devuelve `undefined`. Con la opción activada, expone `DigitalSourceType`
+con el mismo formato de URI que ya usa `c2pa.ts`, así que se creó
+`iptc-digital-source-type.ts` — un clasificador compartido entre ambos,
+para no mantener la misma lista de valores IPTC en dos sitios. Pesa menos
+que C2PA (4 vs. 5) precisamente por no estar firmado: se puede eliminar o
+falsificar sin más esfuerzo que editar el archivo. A diferencia de
+C2PA, la ausencia de `digitalSourceType` en un bloque XMP **no** se trata
+como indicio de "probablemente humano" — firmar C2PA es un acto
+deliberado de procedencia, pero un bloque XMP puede existir por motivos
+totalmente ajenos (perfil de color, palabras clave, valoración) sin que
+quien lo escribió tuviera ningún motivo para declarar origen.
+
+### `url-heuristics.ts` — dominio de alojamiento y nombre de archivo
+
+Analiza la URL de la imagen en sí (`Evidence.sourceId`), sin necesitar
+sus bytes: dominios de alojamiento de salidas de generadores de IA
+(verificados uno a uno por búsqueda antes de incluirlos — lista
+deliberadamente corta y conservadora: `oaidalleapiprodscus.blob.core.windows.net`
+de la API de DALL-E, `replicate.delivery`, `cdn.leonardo.ai`) y patrones
+de nombre de archivo por defecto de esas mismas herramientas antes de
+que el usuario los renombre. Pesa poco (1.2): es circunstancial, basta
+con renombrar el archivo o resubirlo a otro sitio para evitarlo.
+
+### `context-text.ts` — lo que el autor de la página escribió sobre la imagen
+
+No es un metadato del archivo, es texto de la propia página: `alt`,
+`title` o el `<figcaption>` de un `<figure>`, capturados por
+`image-extractor.ts` (nueva función `captureContext`) y enviados junto
+al resto del mensaje `EAS_IMAGE_DETECTED`. Solo es evidencia cuando dice
+algo explícito ("generado por IA", "AI-generated"...) — su ausencia no
+significa nada, la inmensa mayoría de imágenes no llevan ningún aviso.
+
+### Dónde vive el problema de caché
+
+`image-analyzer.ts` cachea EXIF/XMP/C2PA por hash de contenido (dependen
+solo de los bytes, es correcto reutilizarlos si la misma imagen
+reaparece). La señal de contexto de página **no** se cachea así a
+propósito: la misma imagen puede aparecer con un `alt` distinto en cada
+sitio donde se use, así que cachearla por hash de contenido devolvería
+el contexto de la primera página donde se vio la imagen, no el de la
+actual. Se recalcula siempre, por separado del resto — es barata (solo
+comparación de texto, sin fetch ni parseo de formato de archivo).
+
+### Arreglo: dos señales no dependían de los bytes de la imagen
+
+`image-url-heuristics` e `image-context-text` no necesitan descargar la
+imagen — solo su URL y el texto de contexto. Al integrarlas se calculaban,
+por comodidad de código, **después** del `fetch()` de la imagen junto al
+resto de señales (EXIF/XMP/C2PA) — así que si esa descarga fallaba (imagen
+caída, bloqueada por CORS, dominio con URLs efímeras) se perdía **toda**
+la evidencia, incluidas estas dos que no tenían por qué depender de eso.
+`sidepanel/image-analyzer.ts` las separa ahora en
+`computeUrlAndContextEvidence()`, que corre siempre, en paralelo,
+independientemente de si el `fetch()` posterior de los bytes funciona o no.
+
+### Verificado con 5 escenarios reales (no simulados)
+
+`test-pages/image-analysis.html` tiene 5 escenarios, cada uno pensado
+para ejercitar una combinación distinta de señales. Dos imágenes se
+descargan en directo (Truepic y el `C.jpg` de `c2pa-rs`, ya usadas en el
+Capítulo 4); las otras tres son copias locales en `test-pages/assets/`
+con metadatos reales **inyectados** — nunca simulados: se descargó el
+JPEG real, se insertó un segmento APP1 (EXIF o XMP) real y válido justo
+tras el marcador SOI, preservando intactos todos los bytes y segmentos
+originales (incluido cualquier manifiesto C2PA ya presente), y se
+verificó con `exifr` antes de darlo por bueno:
+
+- **Escenario 3**: otra imagen de test C2PA de Adobe distinta de la del
+  escenario 2 (`adobe-20220124-C.jpg`, del mismo repositorio que
+  Truepic) — su C2PA es válido pero, a diferencia de la del escenario 2,
+  **no** declara `digitalSourceType` (confirmado leyendo el manifiesto
+  byte a byte, no asumido), así que es evidencia dura ambigua, leve hacia
+  humano. Renombrada a un patrón típico de DALL·E y envuelta en un
+  `<figure>` con un `<figcaption>` que declara origen de IA — dos señales
+  blandas empujando hacia IA que la evidencia dura debe contener.
+- **Escenario 4**: la misma imagen de Truepic del escenario 1 con un
+  bloque XMP inyectado que declara `trainedAlgorithmicMedia` — XMP
+  empuja con fuerza hacia IA, pero al no estar firmado no puede ganarle
+  al C2PA (dura) que sigue dominando hacia humano.
+- **Escenario 5**: la misma imagen de Adobe del escenario 3 con el campo
+  EXIF `Software: Midjourney 6.1` inyectado, y un `alt` que nombra la
+  misma herramienta sin declaración formal — ejercita a la vez la rama
+  `matchesKnownAiSoftware` de `exif-metadata` y la rama `matchesKnownTool`
+  de `image-context-text`.
+
+### Cómo verificar los datos independientemente
+
+`scripts/inspect-image-metadata.mjs` (ejecutable con
+`npm run inspect:image -- "ruta/a/la/imagen.jpg"`) llama a `exifr` con las
+mismas dos opciones exactas que usan `readExif()` y `readXmp()`
+(`{gps: true}` y `{xmp: true}` respectivamente) sobre cualquier imagen —
+no es una reimplementación, es el mismo código de lectura, así que
+imprime literalmente lo que la extensión también vio. Para C2PA, que no
+puede ejecutarse fuera del navegador (ver Capítulo 4), la vía
+independiente es la herramienta de referencia de la Content Authenticity
+Initiative, [contentcredentials.org/verify](https://contentcredentials.org/verify)
+(arrastrar y soltar, sin instalar nada), o
+[c2patool](https://github.com/contentauth/c2patool), la CLI oficial del
+mismo equipo que mantiene el SDK que usa la extensión.
+
+### Qué NO cambió
+
+- Ninguna señal existente de la Fase 2 se tocó — `exif.ts`, `c2pa.ts`
+  (salvo el refactor a `iptc-digital-source-type.ts` compartido, mismo
+  comportamiento) y el Fusion Engine por niveles siguen igual.
+
+---
+
+## Capítulo 6 — UI: qué atributo concreto detectó cada evidencia
+
+Cada evidencia en el side panel mostraba el nombre fijo de su señal (p.
+ej. "Procedencia C2PA") más la barra y la frase completa — pero una misma
+señal activa ramas muy distintas entre sí (C2PA sin manifiesto, con firma
+inválida, declarando IA, declarando cámara...), así que ese nombre por sí
+solo no bastaba para saber de un vistazo a qué atributo concreto se
+refería la barra. Y, al revés, mostrar siempre la frase completa de cada
+evidencia saturaba la vista en cuanto había varias a la vez. Dos cambios,
+sin tocar `fuse()` ni el cálculo del score — es puramente explicabilidad:
+
+### `Evidence.aspect` — el atributo concreto, no solo la señal
+
+Campo nuevo, obligatorio, en 2-5 palabras (p. ej. "Origen declarado:
+cámara", "Nombre de archivo típico de IA"), distinto del nombre fijo de
+la señal y de `humanReadable` (la frase completa). Cada rama de cada una
+de las 9 señales (las 4 de texto y las 5 de imagen) tiene ahora su propia
+etiqueta. En la UI pasa a ser lo primero y más destacado de cada tarjeta
+de evidencia; el nombre de la señal queda como etiqueta de categoría
+secundaria, pequeña y en mayúsculas.
+
+### `Evidence.details` — desglose atributo por atributo (de momento, solo C2PA)
+
+Campo nuevo, opcional: una lista de pares `{label, value}` con los datos
+crudos concretos que llevaron a la conclusión. Motivado por un caso
+concreto: la rama de firma inválida decía "el historial de procedencia no
+es de fiar", una frase que no dice **qué** dato exacto falló. Ahora, para
+`c2pa-provenance`, cada rama incluye los campos reales que la sustentan
+(`Manifiesto C2PA`, `Firma criptográfica`, `digitalSourceType declarado`
+— ya recortado al término IPTC, no la URL completa — y `Generador
+declarado`), para que se pueda verificar la conclusión contra el dato
+crudo sin tener que confiar en la frase en prosa. El mecanismo es
+genérico y reutilizable en cualquier otra señal; de momento solo se
+rellena en C2PA porque es donde una sola conclusión depende de más
+campos distintos a la vez.
+
+### Side panel: plegado por defecto
+
+`sidepanel.ts`/`sidepanel.css` reestructuran cada tarjeta de evidencia en
+tres niveles: categoría (nombre de la señal, pequeña y muted) → aspecto
+(destacado, encima de la barra) → barra direccional. La frase completa,
+el desglose de atributos (si los hay) y la confianza/peso quedan plegados
+bajo un desplegable "Por qué", visibles con un clic pero sin saturar la
+vista por defecto cuando hay varias evidencias a la vez.
+
+### Qué NO cambió
+
+- `fuse()` y `explain()` no se tocaron — es el mismo score, el mismo
+  Fusion Engine por niveles; este capítulo es solo cómo se presenta la
+  evidencia que ya se calculaba.
+- El campo `details` no se rellenó en EXIF/XMP/URL/contexto en este
+  capítulo — quedan con su frase en prosa de siempre, sin desglose.
